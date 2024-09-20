@@ -6,14 +6,15 @@ particles_per_side = 1;
 total_particles = sides * particles_per_side;
 m = ones(1, total_particles);
 k_int = 10000;
-b_trans = 2;
-b_ang = 2;
+b_trans = 8;
+b_ang = 8;
 
-dt = 0.001;
+dt = 0.01;
 max_t = 100;
 
 % BINARY SEARCH PARAMS
-L = 15;
+L = 10;
+L_old = L;
 r_scale = 0.99;
 P_t = 10;
 P_l = 0.995 * P_t;
@@ -31,9 +32,9 @@ ymax = L/2;
 polygons = cell(1, num_polygons);
 
 % generate initial conditions without overlap
-disp('Generating initial conditions...');
-pressure = 1;
-while pressure > 0
+fprintf('Generating initial conditions...\n');
+pressure = 101;
+while pressure > 100
     for i = 1:num_polygons
         q = [rand()*(xmax-xmin)+xmin, rand()*(ymax-ymin)+ymin];
         v = rand(1, 2)*5 - 2.5;
@@ -42,8 +43,9 @@ while pressure > 0
     end
     box = periodic_box_polygon(polygons, k_int, b_trans, b_ang, -L/2, L/2, -L/2, L/2);
     pressure = box.iterate_time(dt);
+    disp(pressure)
 end
-disp('Found Starting Config');
+fprintf('Found Starting Config\n');
 
 old_state = box;
 
@@ -69,12 +71,15 @@ xlabel('Time');
 ylabel('Energy');
 legend('Kinetic (Trans)', 'Kinetic (Rot)', 'Potential', 'Total');
 
-progress_bar = waitbar(0, 'Running binary search...');
+% Start binary search
+fprintf('Starting binary search...\n');
+iteration = 0;
 while true
+    iteration = iteration + 1;
     [t_values, q_series, v_series, theta_series, w_series,...
     pressure_series, vertices_series, state, polygons, particles_per_side,...
     xmin_series, xmax_series, ymin_series, ymax_series] =...
-    energy_minimize(box, L, L_l, L_h, E_thresh, dt, max_t);
+    energy_minimize(box, L, L_l, L_h, L_tol, E_thresh, dt, max_t);
 
     L_prior = L;
     P = pressure_series(end);
@@ -91,7 +96,7 @@ while true
     else
         if P>P_h
             L_l = L;
-            state = old_state;
+            box = old_state.copy();
             L_prior = L_old;
             L = (L_h + L_l)/2;
         else
@@ -131,18 +136,22 @@ while true
             end
             break;
         end
+
+        % RESIZE SYSTEM HERE
     end
-    waitbar((L_h - L) / (L_h - L_l), progress_bar);
+    fprintf('Binary search iteration: %d, Current L: %.6f, Current P: %.6f\n', iteration, L, P);
 end
-close(progress_bar);
+fprintf('Binary search complete.\n');
 
 function [t_values, q_series, v_series, theta_series, w_series,...
     pressure_series, vertices_series, box, polygons, particles_per_side,...
     xmin_series, xmax_series, ymin_series, ymax_series] =...
-    energy_minimize(system, L, L_l, L_h, E_thresh, dt, max_t)
+    energy_minimize(system, L, L_l, L_h, L_tol, E_thresh, dt, max_t)
     
     box = system.copy();
     num_polygons = numel(box.polygons);
+    polygons = box.polygons;
+    particles_per_side = polygons(1).particles_per_side;
 
     max_t = round(max_t / dt) * dt;
     t_values = 0:dt:max_t;
@@ -159,7 +168,7 @@ function [t_values, q_series, v_series, theta_series, w_series,...
     ymax_series = ones(1, num_steps) * (L/2);
     E_series = zeros(num_steps, 3);
     
-    progress_bar = waitbar(0, 'Running energy minimization...');
+    fprintf('Starting energy minimization...\n');
     for step = 1:num_steps
         pressure_series(step) = box.iterate_time(dt);
     
@@ -183,12 +192,13 @@ function [t_values, q_series, v_series, theta_series, w_series,...
             particles_per_side = polygons(1).particles_per_side;
             break;
         end
-        waitbar(step / num_steps, progress_bar);
+        % update status in command window every 1000 steps
+        if mod(step, 1000) == 0
+            fprintf('Energy minimization step: %d / %d, Current energy: %.6f\n', step, num_steps, E_series(step,3));
+        end
     end
     if L_l > 0 && abs((L_h / L_l) - 1) < L_tol
         error('No jammed packing found.')
     end
-    close(progress_bar);
-    disp('Energy minimization complete');
-
+    fprintf('Energy minimization complete.\n');
 end
