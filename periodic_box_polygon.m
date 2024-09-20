@@ -44,20 +44,24 @@ classdef periodic_box_polygon < handle & matlab.mixin.Copyable
         % NEEDS TO RETURN PRESSURE CALCULATION
         radial_force_magnitudes = zeros(size(obj.polygons));
         
+        force_torque_0 = cell(size(obj.polygons,2),2);
+        theta_0 = zeros(size(obj.polygons,2));
+        
         for i = 1:size(obj.polygons,2)
             % poly = obj.polygons(i);
             % It's essential to make sure that this is the object itself, not a pointer.
 
-            [radial_force_t, torque_t] = obj.total_force_torque(i); % ADD DAMPING DIRECTLY TO FORCE
-            
-            theta_prev = obj.polygons(i).theta;
+            % [radial_force_t, torque_t] = obj.total_force_torque(i); % ADD DAMPING DIRECTLY TO FORCE
+            [radial_force_t,torque_t] = obj.total_force_torque(i);
+
+            theta_0(i,:) = obj.polygons(i).theta;
             % disp('theta_prev')
             % disp(theta_prev)
-
-            mass_tot = sum(obj.polygons(i).m);
+            force_torque_0{i,1} = radial_force_t;
+            force_torque_0{i,2} = torque_t;
             
             newq = obj.polygons(i).q + obj.polygons(i).v * dt +...
-                ((1/(2*mass_tot)) * radial_force_t - obj.b_trans * obj.polygons(i).v) * (dt^2); % APPLY PBC !!NOT DONE YET!! FIGURE OUT IF I WANT TO SCALE TO MASS (ask mark)
+                ((1/(2*obj.polygons(i).mass_tot)) * radial_force_t - obj.b_trans * obj.polygons(i).v) * (dt^2); % APPLY PBC !!NOT DONE YET!! FIGURE OUT IF I WANT TO SCALE TO MASS (ask mark)
             newtheta = obj.polygons(i).theta + obj.polygons(i).w * dt +...
                 ((1/(2*(obj.polygons(i).mofi))) * torque_t - obj.b_ang * obj.polygons(i).w) * (dt^2);
 
@@ -67,12 +71,16 @@ classdef periodic_box_polygon < handle & matlab.mixin.Copyable
             obj.polygons(i).q = newq;
             % obj.polygons(i).q = obj.apply_pbc2d(newq);
             obj.polygons(i).theta = newtheta;
-            
+        end
+        for i = 1:size(obj.polygons,2)
             [radial_force_tdt, torque_tdt] = obj.total_force_torque(i); % ADD DAMPING DIRECTLY TO FORCE
+            radial_force_t = force_torque_0{i,1};
+            torque_t = force_torque_0{i,2};
+            theta_prev = theta_0(i);
 
             obj.polygons(i).v = obj.polygons(i).v...
-                + (dt/(2*mass_tot)) * (radial_force_t + radial_force_tdt)...
-                - (obj.b_trans/mass_tot) * obj.polygons(i).v .* dt;
+                + (dt/(2*obj.polygons(i).mass_tot)) * (radial_force_t + radial_force_tdt)...
+                - (obj.b_trans/obj.polygons(i).mass_tot) * obj.polygons(i).v .* dt;
 
             obj.polygons(i).w = obj.polygons(i).w...
                 + (dt/(2*obj.polygons(i).mofi)) * (torque_t + torque_tdt)...
@@ -384,3 +392,66 @@ end
 %       v(1) = v(1) - Lx * round(v(1) / Lx);
 %       v(2) = v(2) - Ly * round(v(2) / Ly);
 %     end
+
+    % function pressure = iterate_time(obj, dt)
+    %     % updates positions of all polygons cofm so they are modded to box
+    %     % position and angle displacement calculations, with damping terms
+    %     % scaled to sum(polygon.m) and i
+    %     % 
+    %     % Verlet Integration Review:
+    %     % x(t+dt) := x(t) + v(t)dt + \frac{1}{2m}F(x(t))dt^2 - bv(t)dt^2
+    %     % v(t + dt) := v(t) + \frac{dt}{2m} (F(x(t)) + F(x(t+dt))) -
+    %     % (b/m)v(t)dt
+    %     % NEEDS TO RETURN PRESSURE CALCULATION
+    %     radial_force_magnitudes = zeros(size(obj.polygons));
+    % 
+    %     for i = 1:size(obj.polygons,2)
+    %         % poly = obj.polygons(i);
+    %         % It's essential to make sure that this is the object itself, not a pointer.
+    % 
+    %         [radial_force_t, torque_t] = obj.total_force_torque(i); % ADD DAMPING DIRECTLY TO FORCE
+    % 
+    %         theta_prev = obj.polygons(i).theta;
+    %         % disp('theta_prev')
+    %         % disp(theta_prev)
+    % 
+    %         mass_tot = sum(obj.polygons(i).m);
+    % 
+    %         newq = obj.polygons(i).q + obj.polygons(i).v * dt +...
+    %             ((1/(2*mass_tot)) * radial_force_t - obj.b_trans * obj.polygons(i).v) * (dt^2); % APPLY PBC !!NOT DONE YET!! FIGURE OUT IF I WANT TO SCALE TO MASS (ask mark)
+    %         newtheta = obj.polygons(i).theta + obj.polygons(i).w * dt +...
+    %             ((1/(2*(obj.polygons(i).mofi))) * torque_t - obj.b_ang * obj.polygons(i).w) * (dt^2);
+    % 
+    %         % disp('new_theta')
+    %         % disp(newtheta)
+    % 
+    %         obj.polygons(i).q = newq;
+    %         % obj.polygons(i).q = obj.apply_pbc2d(newq);
+    %         obj.polygons(i).theta = newtheta;
+    % 
+    %         [radial_force_tdt, torque_tdt] = obj.total_force_torque(i); % ADD DAMPING DIRECTLY TO FORCE
+    % 
+    %         obj.polygons(i).v = obj.polygons(i).v...
+    %             + (dt/(2*mass_tot)) * (radial_force_t + radial_force_tdt)...
+    %             - (obj.b_trans/mass_tot) * obj.polygons(i).v .* dt;
+    % 
+    %         obj.polygons(i).w = obj.polygons(i).w...
+    %             + (dt/(2*obj.polygons(i).mofi)) * (torque_t + torque_tdt)...
+    %             - (obj.b_ang/obj.polygons(i).mofi) * obj.polygons(i).w * dt;
+    %         obj.polygons(i).rotate_vertices(obj.polygons(i).theta - theta_prev);
+    % 
+    %         radial_force_magnitudes(i) = norm(radial_force_tdt);
+    %         % DEBUG
+    %         % disp('=====================')
+    %         % disp(['Snapshot at ', num2str(obj.t)]) 
+    %         % disp(['Polygon ', num2str(i), ': x:', num2str(newq(1)), ', y: ', num2str(newq(2))])
+    %         % disp(['v_x: ', num2str(obj.polygons(i).v(1)), ', v_y: ', num2str(obj.polygons(i).v(2))])
+    %         % disp(['Radial Force: ', num2str(radial_force_tdt(1)), ' ', num2str(radial_force_tdt(2))])
+    %         % disp(['Torque: ', num2str(torque_tdt)])
+    %         % disp('=====================')
+    %     end
+    % 
+    % 
+    %     obj.t = obj.t + dt;
+    %     pressure = sum(radial_force_magnitudes)*(1/(2*obj.get_area));
+    % end

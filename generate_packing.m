@@ -136,8 +136,10 @@ while true
             end
             break;
         end
-
-        % RESIZE SYSTEM HERE
+    end
+    % RESIZE SYSTEM HERE
+    if L_l > 0 && abs((L_h / L_l) - 1) < L_tol
+        error('No jammed packing found.')
     end
     fprintf('Binary search iteration: %d, Current L: %.6f, Current P: %.6f\n', iteration, L, P);
 end
@@ -196,9 +198,6 @@ function [t_values, q_series, v_series, theta_series, w_series,...
         if mod(step, 1000) == 0
             fprintf('Energy minimization step: %d / %d, Current energy: %.6f\n', step, num_steps, E_series(step,3));
         end
-    end
-    if L_l > 0 && abs((L_h / L_l) - 1) < L_tol
-        error('No jammed packing found.')
     end
     fprintf('Energy minimization complete.\n');
 end

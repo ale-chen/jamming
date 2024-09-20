@@ -12,6 +12,7 @@ classdef regular_polygon < handle & matlab.mixin.Copyable
     vertices % individual vertex locations
     vertices_relative % individual vertex locations RELATIVE TO Q
     particles_per_side % self explanatory
+    mass_tot % self explanatory
 
     torque % total torque calculation
     force % total force calculation
@@ -32,6 +33,7 @@ classdef regular_polygon < handle & matlab.mixin.Copyable
             obj.vertices = obj.get_vertices();
             obj.mofi = obj.calculate_moment_of_inertia();
             obj.particles_per_side = particles_per_side;
+            obj.mass_tot = sum(m);
         end
         function vertices = get_vertices(obj)
             vertices = obj.vertices_relative + obj.q;

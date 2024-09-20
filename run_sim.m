@@ -1,66 +1,68 @@
-% % parameters
-% num_polygons = 6;
-% sigma = 3;
-% sides = 3;
-% particles_per_side = 1;
-% total_particles = sides * particles_per_side;
-% m = ones(1, total_particles);
-% k_int = 10000;
-% b_trans = 2;
-% b_ang = 2;
-% xmin = -10;
-% xmax = 10;
-% ymin = -10;
-% ymax = 10;
-% dt = 0.001;
-% max_t = 100;
-% box_shrink_rate = 0.01; % per second
-% 
-% polygons = cell(1, num_polygons);
-% 
-% % generate initial conditions without overlap
-% pressure = 1;
-% while pressure > 0
-%     for i = 1:num_polygons
-%         q = [rand()*(xmax-xmin)+xmin, rand()*(ymax-ymin)+ymin];
-%         v = rand(1, 2)*5 - 2.5;
-%         w = 0;
-%         polygons{i} = regular_polygon(sigma, sides, m, q, v, w, particles_per_side);
-%     end
-%     box = periodic_box_polygon(polygons, k_int, b_trans, b_ang, xmin, xmax, ymin, ymax);
-%     pressure = box.iterate_time(dt); % calculate initial pressure, is it
-%     % ok to just do this? I think you're adding a time step in the final
-%     % run.
-% end
-% 
-% disp('Found Starting Config')
-
-% SIMPLE SETUP FOR DEBUGGING
-tiny = 0.0000000001;
-
-num_polygons = 2;
+% parameters
+num_polygons = 6;
 sigma = 3;
 sides = 3;
 particles_per_side = 1;
 total_particles = sides * particles_per_side;
-m = [1,1,1]; % some particles have no mass, cofm is in first particle
-k_int = 100;
-b_trans = 0;
-b_ang = 0;
+m = ones(1, total_particles);
+k_int = 10000;
+b_trans = 2;
+b_ang = 2;
 xmin = -10;
 xmax = 10;
 ymin = -10;
 ymax = 10;
-dt = 0.0001;
-max_t = 20;
+dt = 0.001;
+max_t = 100;
+box_shrink_rate = 0.01; % per second
 
-box_shrink_rate = 0; % per second
+polygons = cell(1, num_polygons);
 
-polygons{1} = regular_polygon(sigma, sides, m, [-6,0], [2,0], 0, particles_per_side);
-polygons{2} = regular_polygon(sigma, sides, m, [0,0], [0,0], 0, particles_per_side);
+% generate initial conditions without overlap
+pressure = 1;
+while pressure > 0
+    for i = 1:num_polygons
+        q = [rand()*(xmax-xmin)+xmin, rand()*(ymax-ymin)+ymin];
+        v = rand(1, 2)*5 - 2.5;
+        w = 0;
+        polygons{i} = regular_polygon(sigma, sides, m, q, v, w, particles_per_side);
+    end
+    box = periodic_box_polygon(polygons, k_int, b_trans, b_ang, xmin, xmax, ymin, ymax);
+    pressure = box.iterate_time(dt); % calculate initial pressure, is it
+    % ok to just do this? I think you're adding a time step in the final
+    % run.
+end
 
-box = periodic_box_polygon(polygons, k_int, b_trans, b_ang, xmin, xmax, ymin, ymax);
-box.polygons(2).rotate_vertices(pi);
+disp('Found Starting Config')
+
+% % SIMPLE SETUP FOR DEBUGGING
+% tiny = 0.0000000001;
+% 
+% num_polygons = 2;
+% sigma = 3;
+% sides = 3;
+% particles_per_side = 1;
+% total_particles = sides * particles_per_side;
+% m = [1,1,1]; % some particles have no mass, cofm is in first particle
+% k_int = 100;
+% b_trans = 0;
+% b_ang = 0;
+% xmin = -10;
+% xmax = 10;
+% ymin = -10;
+% ymax = 10;
+% dt = 0.0001;
+% max_t = 20;
+% 
+% box_shrink_rate = 0; % per second
+% 
+% polygons = cell(1, num_polygons);
+% 
+% polygons{1} = regular_polygon(sigma, sides, m, [-6,0], [2,0], 0, particles_per_side);
+% polygons{2} = regular_polygon(sigma, sides, m, [0,0], [0,0], 0, particles_per_side);
+% 
+% box = periodic_box_polygon(polygons, k_int, b_trans, b_ang, xmin, xmax, ymin, ymax);
+% box.polygons(2).rotate_vertices(pi);
 
 
 % store the data time series
