@@ -4,8 +4,10 @@ classdef regular_polygon < handle & matlab.mixin.Copyable
     sides % sides (int)
     k % vertex spring constant (float)
     m % vertex mass (N vector)
-    q % position c of m (float)
-    v % translational velocity (float)
+    q % position c of m (float, dim vector)
+    v % translational velocity (float, dim vector)
+    F_rad % force felt previously (float, dim vector)
+    T % torque felt previous (float)
     theta % angle
     w % angular velocity (float)
     mofi % moment of inertia
@@ -13,9 +15,6 @@ classdef regular_polygon < handle & matlab.mixin.Copyable
     vertices_relative % individual vertex locations RELATIVE TO Q
     particles_per_side % self explanatory
     mass_tot % self explanatory
-
-    torque % total torque calculation
-    force % total force calculation
     end
 
     methods
@@ -34,6 +33,9 @@ classdef regular_polygon < handle & matlab.mixin.Copyable
             obj.mofi = obj.calculate_moment_of_inertia();
             obj.particles_per_side = particles_per_side;
             obj.mass_tot = sum(m);
+
+            obj.F_rad = [0,0]; % initialize with nothing at first
+            obj.T = 0; % initialize with nothing at first
         end
         function vertices = get_vertices(obj)
             vertices = obj.vertices_relative + obj.q;
@@ -55,7 +57,7 @@ classdef regular_polygon < handle & matlab.mixin.Copyable
             obj.vertices = obj.get_vertices();
         end
 
-        function v = rotate2d(obj, theta,v)
+        function v = rotate2d(obj, theta, v)
             if (size(v)==size([1,1]))
                 v = ([cos(theta),-sin(theta); sin(theta), cos(theta)] * v')';
             elseif(size(v)==size([1;1]))

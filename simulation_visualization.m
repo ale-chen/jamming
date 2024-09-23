@@ -29,7 +29,7 @@ line_total = plot(nan, nan, 'k-', 'LineWidth', 1.5);
 legend('Kinetic (Trans)', 'Kinetic (Rot)', 'Potential', 'Total');
 
 for step = 1:num_steps
-    if mod(step,1000) == 0
+    if mod(step,100) == 0
         % Update the simulation plot
         subplot(2, 1, 1);
         cla;
