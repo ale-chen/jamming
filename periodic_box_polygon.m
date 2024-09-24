@@ -41,7 +41,6 @@ classdef periodic_box_polygon < handle & matlab.mixin.Copyable
         % v(t + dt) := v(t) + \frac{dt}{2m} (F(x(t)) + F(x(t+dt))) -
         % (b/m)v(t)dt
         % NEEDS TO RETURN PRESSURE CALCULATION
-        radial_force_magnitudes = zeros(size(obj.polygons));
         
         % PERSISTENT VARIABLES THROUGH STEPS/STAGES
 
@@ -50,13 +49,17 @@ classdef periodic_box_polygon < handle & matlab.mixin.Copyable
 
         force_rad_new = zeros(size(obj.polygons,2),2);
         torque_new = zeros([size(obj.polygons,2),1]);
+
+        pressure = 0;
         
         % FIRST STEP:
         for i = 1:size(obj.polygons, 2)
             % in the case that this is the first itreation,
             % calculate forces. Otherwise, grab from previous iteration.
             if obj.t == 0
-                [force_rad_old(i,:), torque_old(i), V_check] = obj.total_force_torque(i);
+                [force_rad_old(i,:), torque_old(i), ~, ~] = obj.total_force_torque(i);
+                force_rad_old(i,:) = force_rad_old(i,:) - (obj.b_trans * obj.polygons(i).v);
+                torque_old(i) = torque_old(i,:) - (obj.b_ang * obj.polygons(i).w);
             else
                 force_rad_old(i,:) = obj.polygons(i).F_rad;
                 torque_old(i) = obj.polygons(i).T;
@@ -76,7 +79,10 @@ classdef periodic_box_polygon < handle & matlab.mixin.Copyable
         
         % SECOND STEP:
         for i = 1:size(obj.polygons,2)
-            [new_force, new_torque, V_check] = obj.total_force_torque(i);
+            [new_force, new_torque, P_cont, V_check] = obj.total_force_torque(i);
+            
+            new_force = new_force - (obj.b_trans * obj.polygons(i).v);
+            new_torque = new_torque - (obj.b_ang * obj.polygons(i).w);
 
             obj.polygons(i).F_rad = new_force;
             obj.polygons(i).T = new_torque;
@@ -84,6 +90,7 @@ classdef periodic_box_polygon < handle & matlab.mixin.Copyable
 
             force_rad_new(i,:) = new_force;
             torque_new(i) = new_torque;
+            pressure = pressure + P_cont;
         end
         
         V = obj.get_potential();
@@ -95,18 +102,13 @@ classdef periodic_box_polygon < handle & matlab.mixin.Copyable
 
             obj.polygons(i).v =  obj.polygons(i).v... % v_0
                 + (dt/(2*obj.polygons(i).mass_tot))...
-                    * (radial_force_t + force_rad_old(i,:))... % F_0, F_1
-                - (obj.b_trans/obj.polygons(i).mass_tot)...
-                    * obj.polygons(i).v .* dt; % v_0
+                    * (radial_force_t + force_rad_old(i,:)); % F_0, F_1
+
             
             obj.polygons(i).w = obj.polygons(i).w... % w_0
                 + (dt/(2*obj.polygons(i).mofi))...
-                    * (torque_t + torque_old(i))... % T_0, T_1
-                - (obj.b_ang/obj.polygons(i).mofi)...
-                    * obj.polygons(i).w * dt; % w_0
+                    * (torque_t + torque_old(i)); % T_0, T_1
             % now polygons' internal force/torque are v_1, w_1
-
-            radial_force_magnitudes(i) = norm(obj.polygons(i).F_rad);
         end
         % DEBUG
         % disp('=====================')
@@ -118,16 +120,17 @@ classdef periodic_box_polygon < handle & matlab.mixin.Copyable
         % disp('=====================')
         [T_trans, T_rot] = obj.get_kinetic();
         obj.t = obj.t + dt;
-        pressure = sum(radial_force_magnitudes)*(1/(2*obj.get_area));
+        pressure = pressure*(1/(4*obj.get_area));
     end
 
-    function [F_rad_tot, torque, V] = total_force_torque(obj, polygon_id)
+    function [F_tot, torque, P_cont, V] = total_force_torque(obj, polygon_id)
         % Force is vector valued [x,y]
         % torque: scalar valued (counterclockwise via rhr)
         
         V = 0;
-        F_rad_tot = [0,0];
+        F_tot = [0,0];
         torque = 0; % return vector torque (shear) with positive/negative contributions
+        P_cont = 0;
         % don't iterate over self
         main_polygon = obj.polygons(polygon_id);
         % disp(main_polygon)
@@ -144,6 +147,10 @@ classdef periodic_box_polygon < handle & matlab.mixin.Copyable
             vertex_tot = [0,0]; % don't split force/torque yet
             for j = 1:numel(obj.polygons)
                 if j ~= polygon_id
+
+                    rij = obj.pbc_vector_difference(obj.polygons(polygon_id).q...
+                        ,obj.polygons(j).q);
+                    
                     other_polygon = obj.polygons(j);
                     other_vertices = other_polygon.get_vertices();
             
@@ -154,6 +161,7 @@ classdef periodic_box_polygon < handle & matlab.mixin.Copyable
                             other_vertex, main_vertex);
                         vertex_tot = vertex_tot + F12;
                         V = V + E12;
+                        P_cont = P_cont + dot(F12,rij);
                     end
                 end
             end
@@ -168,7 +176,7 @@ classdef periodic_box_polygon < handle & matlab.mixin.Copyable
             % F_rad_tot = F_rad_tot + force_radial;
 
             % total force instead
-            F_rad_tot = F_rad_tot + vertex_tot;
+            F_tot = F_tot + vertex_tot;
 
             % DEBUG
             % disp(['vertex ', num2str(vertex),' r_unit: ',num2str(r_unit)])
