@@ -1,5 +1,5 @@
 % parameters
-num_polygons = 10;
+num_polygons = 12;
 sigma = 1;
 sides = 3;
 particles_per_side = 2;
@@ -117,6 +117,10 @@ while true
         error('No jammed packing found.')
     end 
     fprintf('Binary search iteration: %d, Current L: %.6f, Current P: %.6f\n', iteration, L, P);
+    save(['jammed_data/iteration' num2str(iteration) 'L' num2str(L_old) 'P' num2str(P)], ...
+        't_values','q_series','v_series','theta_series','w_series','pressure_series','vertices_series',...
+        'box','polygons','particles_per_side','xmin_series','xmax_series','ymin_series','ymax_series'...
+        )
 end
 fprintf('Binary search complete.\n');
 
@@ -156,7 +160,7 @@ function [t_values, q_series, v_series, theta_series, w_series,...
     v_series = cell(1, num_polygons);
     theta_series = cell(1, num_polygons);
     w_series = cell(1, num_polygons);
-    pressure_series = zeros(1, num_steps);
+    pressure_series = zeros(1, num_polygons);
     vertices_series = cell(num_polygons, num_steps);
     xmin_series = -L/2 * ones(1, num_steps);
     xmax_series = L/2 * ones(1, num_steps); 
@@ -166,10 +170,9 @@ function [t_values, q_series, v_series, theta_series, w_series,...
     
     fprintf('Starting energy minimization...\n');
     for step = 1:num_steps
-        pressure_series(step) = box.iterate_time(dt);
-    
-        [E_series(step,1),E_series(step,2)] = box.get_kinetic();
-        E_series(step,3) = box.get_potential();
+        [pressure_series(step),...
+        E_series(step,1),E_series(step,2),E_series(step,3)]...
+            = box.iterate_time(dt);
         for polygon = 1:num_polygons
             poly = box.polygons(polygon);
             q_series{polygon}(step, :) = box.apply_pbc2d(poly.q);
