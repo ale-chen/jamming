@@ -6,13 +6,13 @@ particles_per_side = 2;
 total_particles = sides * particles_per_side;
 m = ones(1, total_particles);
 k_int = 10000;
-b_trans = 50;
-b_ang = 50;
+b_trans = 100;
+b_ang = 100;
 dt = 0.001;
 max_t = 20;
 
 % Binary search parameters
-L = 7.55;
+L = 7.9;
 L_old = L;
 r_scale = 0.999; 
 P_t = 10; 
@@ -21,7 +21,7 @@ P_h = 1.05 * P_t;
 L_l = -1;
 L_h = -1;
 L_tol = 0.001;
-E_thresh = 1e-6;
+E_thresh = 1e-4;
 num_minimization_steps = 5000;
 
 % Initialize system
@@ -62,6 +62,7 @@ fprintf('Starting binary search...\n');
 iteration = 0;
 success = false;
 
+
 while true
     iteration = iteration + 1;
     fprintf('Binary search iteration: %d\n', iteration);
@@ -75,71 +76,59 @@ while true
     [P, overlap_count] = calculate_pressure(box);
     fprintf('Current L: %.6f, Current P: %.6f (Target: %.6f), Contacts: %d\n', L, P, P_t, overlap_count);
     
-    L_prior = L;
-    
-    % Binary search logic
+    % Binary search logic with explicit state tracking
     if P < P_l
-        fprintf('  Pressure too low, compressing system\n');
-        old_state = box.copy();
-        L_old = L;
-        L_h = L;
+        fprintf('  P < P_l: System is UNJAMMED at L = %.6f\n', L);
+        old_state = box.copy();  % Save unjammed state
+        L_old = L;              % Save current length for rescaling
+        L_h = L;                % This length becomes upper bound (unjammed)
+        
         if L_l > 0
-            L = 0.7*L_h + 0.3*L_l;
-            L_l = -1;
+            fprintf('    Known jammed state exists at L_l = %.6f\n', L_l);
+            L = (L_h + L_l)/2;  % Try halfway
+            fprintf('    Trying halfway point L = %.6f\n', L);
+            L_l = -1;           % Reset L_l as rearrangement possible
         else
-            L = L * r_scale;
+            fprintf('    No known jammed state, shrinking by r_scale\n');
+            L = L * r_scale;    % Shrink by fixed amount
         end
     else
         if P > P_h
-            fprintf('  Pressure too high, expanding system\n');
-            L_l = L;
-            % Don't reset to old state, just rescale current state
-            if L_h > 0
-                L = 0.3*L_h + 0.7*L_l;
-            else
-                L = L / r_scale;
-            end
+            fprintf('  P > P_h: System is JAMMED at L = %.6f\n', L);
+            L_l = L;                % This length becomes lower bound (jammed)
+            box = old_state.copy();  % Reset to last unjammed state
+            L = (L_h + L_l)/2;      % Try halfway between jammed and unjammed
+            fprintf('    Reset to unjammed state at L_h = %.6f\n', L_h);
+            fprintf('    Trying halfway point L = %.6f\n', L);
         else
-            fprintf('  Target pressure achieved!\n');
+            fprintf('  P_l ≤ P ≤ P_h: Target pressure achieved!\n');
             success = true;
             break;
         end
     end
     
-    % Prevent too large changes in L
-    max_change = 0.02;
-    if abs(L/L_prior - 1) > max_change
-        if L > L_prior
-            L = L_prior * (1 + max_change);
-        else
-            L = L_prior * (1 - max_change);
-        end
-        fprintf('  Limited L change to %.1f%%\n', max_change*100);
-    end
-    
-    % Rescale system while maintaining state
+    % Update box size and rescale system
     scale_factor = L/L_old;
+    fprintf('  Rescaling system by factor: %.6f\n', scale_factor);
+    
     for i = 1:numel(box.polygons)
-        % Scale positions
         box.polygons(i).q = box.polygons(i).q * scale_factor;
-        % Scale velocities to maintain kinetic energy
         box.polygons(i).v = box.polygons(i).v * sqrt(scale_factor);
-        % Angular quantities don't need scaling
     end
     box.xmin = -L/2;
     box.xmax = L/2;
     box.ymin = -L/2;
     box.ymax = L/2;
     
-    % Check for convergence failure
+    % Check for convergence failure with detailed state info
     if L_l > 0 && L_h > 0 && abs((L_h / L_l) - 1) < L_tol
-        fprintf('\nSearch window converged but no jammed state found:\n');
-        fprintf('L_h = %.6f (P = %.6f)\n', L_h, P_t/P_h);
-        fprintf('L_l = %.6f (P = %.6f)\n', L_l, P_t/P_l);
-        error('No jammed packing found in this pressure window. Try adjusting P_t or widening the pressure window.');
+        fprintf('\nBinary search failed to find jammed state:\n');
+        fprintf('L_h = %.6f (unjammed, P < %.6f)\n', L_h, P_l);
+        fprintf('L_l = %.6f (jammed, P > %.6f)\n', L_l, P_h);
+        fprintf('(L_h/L_l - 1) = %.6e (tolerance: %.6e)\n', abs(L_h/L_l - 1), L_tol);
+        error('No jammed packing found in this pressure window.');
     end
 end
-
 if success
     fprintf('Jammed state found! Saving final configuration...\n');
     save_jammed_state(box, L, P);
