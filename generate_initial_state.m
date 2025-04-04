@@ -1,3 +1,6 @@
+% RNG SEED
+
+
 function generate_initial_state(...
     output_dir,...
     params_dir,...
@@ -34,7 +37,7 @@ function generate_initial_state(...
         "E_thresh": 
         "P_t": 0.001,
         "P_tol_log": 3,
-        "r_scale": 0.999
+        "r_scale": 0.999,
     %}
     % x'' + kx/m + 2\zeta\sqrt{k/m} x' = 0 would be ideal,
     % but damping is done on each larger particle, not asperity.
