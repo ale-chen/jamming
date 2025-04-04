@@ -40,8 +40,8 @@ def generate_json(
         })
 def main(json_directory, min_sides = 3, max_sides = 12, min_bumps_per_side = 1, max_bumps_per_side = 20, N = 512, sigma = 1):
     command_file_string = ''
-    command_string = """module load MATLAB/2023a && matlab -nodisplay -r "generate_initial_state('_output','./_param_files','{filename}.json','false'); exit;
-    """""
+    command_string = """module load MATLAB/2023a && matlab -nodisplay -r "generate_initial_state('_output','./_param_files','{filename}.json','false'); exit;"
+    """
 
     jsons, filenames = param_ranges(min_sides,max_sides,min_bumps_per_side, max_bumps_per_side, N, sigma);
     # 10 copies per param
