@@ -1,1 +1,1 @@
-module load MATLAB/2023a && matlab -nodisplay -r "generate_initial_state('_output','./_param_files','example_params.json','false');" exit()
+module load MATLAB/2023a && matlab -nodisplay -r "generate_initial_state('_output','./_param_files','example_params.json','false'); exit;"
