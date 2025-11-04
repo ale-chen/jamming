@@ -6,6 +6,7 @@
 For parfor:
 
 dsq --job-file dive_mapping_jobs.txt -t 20\:00\:00 --account=pi_bp599 --cpus-per-task 16 --mem-per-cpu 2g
+
 **In dsQ .txt batch file:**
 
 "MATLAB COMMAND; exit; (linebreak for new worker)"
